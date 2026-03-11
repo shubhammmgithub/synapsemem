@@ -1,0 +1,2 @@
+[console_scripts]
+synapsemem = synapsemem.cli.synapsemem_cli:main

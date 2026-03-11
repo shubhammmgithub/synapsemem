@@ -1,7 +1,11 @@
 sentence-transformers>=2.7.0
+
+[dashboard]
 fastapi>=0.115.0
 uvicorn>=0.30.0
 pydantic>=2.8.0
+
+[dev]
 pytest>=8.0.0
 build>=1.2.1
 twine>=5.1.0

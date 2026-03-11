@@ -1,0 +1,84 @@
+Metadata-Version: 2.4
+Name: synapsemem
+Version: 0.1.0
+Summary: A lightweight neuro-symbolic memory engine for LLM agents.
+Author: Shubham Raj
+License: # MIT License
+        
+        © 2026 SynapseMem Contributors
+        
+        Permission is hereby granted, free of charge, to any person obtaining a copy
+        of this software and associated documentation files (the "Software"), to deal
+        in the Software without restriction, including without limitation the rights
+        to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+        copies of the Software, and to permit persons to whom the Software is
+        furnished to do so, subject to the following conditions:
+        
+        The above copyright notice and this permission notice shall be included in all
+        copies or substantial portions of the Software.
+        
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+        
+Keywords: llm,memory,ai-agents,rag,knowledge-graph,neuro-symbolic
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: sentence-transformers>=2.7.0
+Provides-Extra: dashboard
+Requires-Dist: fastapi>=0.115.0; extra == "dashboard"
+Requires-Dist: uvicorn>=0.30.0; extra == "dashboard"
+Requires-Dist: pydantic>=2.8.0; extra == "dashboard"
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0.0; extra == "dev"
+Requires-Dist: build>=1.2.1; extra == "dev"
+Requires-Dist: twine>=5.1.0; extra == "dev"
+Dynamic: license-file
+Dynamic: requires-python
+
+# SynapseMem
+
+SynapseMem is a lightweight neuro-symbolic memory engine for LLM agents.
+
+It helps AI systems remember useful user information across interactions by combining:
+
+- atomic fact extraction
+- memory consolidation
+- semantic retrieval
+- pinned anchors
+- symbolic graph memory
+- prompt construction
+
+## Features
+
+- Rule-based triplet extraction for memory facts
+- In-memory storage for MVP usage
+- Relevance-based retrieval
+- Pinned anchor support
+- Symbolic graph layer for basic fact traversal
+- Provider-agnostic LLM integration
+- CLI support
+- FastAPI dashboard stub
+
+## Installation
+
+### Basic install
+
+```bash
+pip install .
+
+
+Install with dashboard support
+pip install ".[dashboard]"
+Install with development tools
+pip install ".[dev]"
