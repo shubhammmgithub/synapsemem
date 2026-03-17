@@ -1,17 +1,19 @@
 """Memory module - Core memory management system"""
 
-from .extractor import TripletExtractor
-from .consolidator import MemoryConsolidator
-from .storage import MemoryStorage
-from .retriever import MemoryRetriever
 from .anchors import AnchorManager
-from .decay import compute_decay_score
+from .extractor import TripletExtractor
+from .ingest_consolidator import IngestConsolidator
+from .retriever import MemoryRetriever
+from .sleep_consolidator import SleepConsolidator
+from .sqlite_storage import SQLiteMemoryStorage
+from .storage import MemoryStorage
 
 __all__ = [
-    "TripletExtractor",
-    "MemoryConsolidator",
-    "MemoryStorage",
-    "MemoryRetriever",
     "AnchorManager",
-    "compute_decay_score",
+    "TripletExtractor",
+    "IngestConsolidator",
+    "MemoryRetriever",
+    "SleepConsolidator",
+    "SQLiteMemoryStorage",
+    "MemoryStorage",
 ]

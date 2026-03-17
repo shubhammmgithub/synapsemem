@@ -1,5 +1,4 @@
-"""Triplet extraction from raw text data"""
-
+"""Triplet extraction from raw text data."""
 
 from __future__ import annotations
 
@@ -11,19 +10,22 @@ class TripletExtractor:
     """
     Lightweight rule-based triplet extractor.
 
-    Output format:
-    {
-        "subject": "user",
-        "predicate": "likes",
-        "object": "hiking",
-        "topic": "preference",
-        "priority": 5,
-        "source_text": "I like hiking"
-    }
+    Supports:
+    - First-person user memories
+    - Third-person named-entity facts
+    - Delete-style memory commands
     """
 
     def __init__(self) -> None:
         self._patterns = [
+            # Delete / forget commands
+            (r"\bForget that I love ([\w\s\-]+)", "user", "loves", "preference", 6),
+            (r"\bForget that I like ([\w\s\-]+)", "user", "likes", "preference", 5),
+            (r"\bForget that I live in ([\w\s\-]+)", "user", "lives_in", "profile", 7),
+            (r"\bDelete that I work on ([\w\s\-]+)", "user", "works_on", "project", 7),
+            (r"\bRemove that I am preparing for ([\w\s\-]+)", "user", "preparing_for", "goal", 8),
+
+            # First-person user facts
             (r"\bI like ([\w\s\-]+)", "user", "likes", "preference", 5),
             (r"\bI love ([\w\s\-]+)", "user", "loves", "preference", 6),
             (r"\bI prefer ([\w\s\-]+)", "user", "prefers", "preference", 6),
@@ -36,13 +38,22 @@ class TripletExtractor:
             (r"\bI am preparing for ([\w\s\-]+)", "user", "preparing_for", "goal", 8),
             (r"\bI want to build ([\w\s\-]+)", "user", "wants_to_build", "goal", 7),
             (r"\bI use ([\w\s,\-]+)", "user", "uses", "tooling", 5),
+            (r"\bI am in ([\w\s\-]+)", "user", "located_in", "location", 6),
+            (r"\bI am interested in ([\w\s\-]+)", "user", "interested_in", "interest", 6),
+
+            # Third-person / named-entity facts
+            (r"\b([A-Z][\w\-]*(?:\s+[A-Z][\w\-]*)*) is located in ([\w\s\-]+)", None, "located_in", "location", 6),
+            (r"\b([A-Z][\w\-]*(?:\s+[A-Z][\w\-]*)*) lives in ([\w\s\-]+)", None, "lives_in", "profile", 7),
+            (r"\b([A-Z][\w\-]*(?:\s+[A-Z][\w\-]*)*) is in ([\w\s\-]+)", None, "located_in", "location", 6),
+            (r"\b([A-Z][\w\-]*(?:\s+[A-Z][\w\-]*)*) likes ([\w\s\-]+)", None, "likes", "preference", 5),
+            (r"\b([A-Z][\w\-]*(?:\s+[A-Z][\w\-]*)*) loves ([\w\s\-]+)", None, "loves", "preference", 6),
+            (r"\b([A-Z][\w\-]*(?:\s+[A-Z][\w\-]*)*) prefers ([\w\s\-]+)", None, "prefers", "preference", 6),
+            (r"\b([A-Z][\w\-]*(?:\s+[A-Z][\w\-]*)*) is interested in ([\w\s\-]+)", None, "interested_in", "interest", 6),
+            (r"\b([A-Z][\w\-]*(?:\s+[A-Z][\w\-]*)*) works at ([\w\s\-]+)", None, "works_at", "work", 7),
+            (r"\b([A-Z][\w\-]*(?:\s+[A-Z][\w\-]*)*) works on ([\w\s\-]+)", None, "works_on", "project", 7),
         ]
 
     def extract(self, text: str) -> List[Dict]:
-        """
-        Extract triplets from raw user text.
-        Falls back to a generic memory if no pattern matches.
-        """
         text = self._normalize_text(text)
         triplets: List[Dict] = []
 
@@ -52,22 +63,31 @@ class TripletExtractor:
                 continue
 
             matched = False
+
             for pattern, subject, predicate, topic, priority in self._patterns:
                 match = re.search(pattern, sentence, flags=re.IGNORECASE)
-                if match:
-                    obj = self._clean_object(match.group(1))
-                    if obj:
-                        triplets.append(
-                            self._build_triplet(
-                                subject=subject,
-                                predicate=predicate,
-                                obj=obj,
-                                topic=topic,
-                                priority=priority,
-                                source_text=sentence,
-                            )
+                if not match:
+                    continue
+
+                if subject is None:
+                    extracted_subject = self._clean_subject(match.group(1))
+                    extracted_object = self._clean_object(match.group(2))
+                else:
+                    extracted_subject = subject
+                    extracted_object = self._clean_object(match.group(1))
+
+                if extracted_subject and extracted_object:
+                    triplets.append(
+                        self._build_triplet(
+                            subject=extracted_subject,
+                            predicate=predicate,
+                            obj=extracted_object,
+                            topic=topic,
+                            priority=priority,
+                            source_text=sentence,
                         )
-                        matched = True
+                    )
+                    matched = True
 
             if not matched and self._looks_memory_worthy(sentence):
                 triplets.append(
@@ -88,6 +108,11 @@ class TripletExtractor:
 
     def _normalize_text(self, text: str) -> str:
         return re.sub(r"\s+", " ", text).strip()
+
+    def _clean_subject(self, subject: str) -> str:
+        subject = subject.strip(" .,!?:;")
+        subject = re.sub(r"\s+", " ", subject)
+        return subject.lower()
 
     def _clean_object(self, obj: str) -> str:
         obj = obj.strip(" .,!?:;")

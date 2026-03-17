@@ -25,6 +25,7 @@ synapsemem/memory/consolidator.py
 synapsemem/memory/decay.py
 synapsemem/memory/extractor.py
 synapsemem/memory/retriever.py
+synapsemem/memory/sqlite_storage.py
 synapsemem/memory/storage.py
 synapsemem/prompt/__init__.py
 synapsemem/prompt/builder.py

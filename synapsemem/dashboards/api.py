@@ -14,7 +14,13 @@ except ImportError as exc:
 from synapsemem import SynapseMemory
 
 app = FastAPI(title="SynapseMem Dashboard API", version="0.1.0")
-memory = SynapseMemory()
+memory = SynapseMemory(
+    storage_backend="sqlite",
+    sqlite_db_path="synapsemem.db",
+    user_id="dashboard_user",
+    agent_id="dashboard_agent",
+    session_id="dashboard_session",
+)
 
 
 class IngestRequest(BaseModel):
