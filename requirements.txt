@@ -1,7 +1,28 @@
+# ── Core (Phase 1 + 2) ────────────────────────────────────────────────
 sentence-transformers>=2.7.0
 fastapi>=0.115.0
 uvicorn>=0.30.0
 pydantic>=2.8.0
+
+# ── Phase 3: Step 1 — Vector DB adapters ─────────────────────────────
+qdrant-client>=1.9.0
+chromadb>=0.5.0
+
+# ── Phase 3: Step 2 — Async pipeline ─────────────────────────────────
+celery>=5.4.0
+redis>=5.0.0
+
+# ── Phase 3: Step 5 — Framework integrations (optional) ──────────────
+# Install only what you use — both are optional deps
+# langchain>=0.2.0
+# langchain-core>=0.2.0
+# crewai>=0.51.0
+# crewai-tools>=0.8.0
+
+# ── Dev / testing ─────────────────────────────────────────────────────
 pytest>=8.0.0
+pytest-asyncio>=0.23.0
+
+# ── Build / publish ───────────────────────────────────────────────────
 build>=1.2.1
 twine>=5.1.0

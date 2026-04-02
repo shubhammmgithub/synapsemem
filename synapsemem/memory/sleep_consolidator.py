@@ -9,12 +9,11 @@ from typing import Any, Dict, List, Tuple
 
 class SleepConsolidator:
     """
-    Phase 1 sleep consolidation:
+    Phase 2 sleep consolidation:
     - merge exact duplicate memories
     - prune weak / stale memories
+    - promote repeated episodic memories to semantic memories
     - support dry-run reporting
-
-    This is intentionally separate from the online IngestConsolidator.
     """
 
     def __init__(
@@ -23,17 +22,17 @@ class SleepConsolidator:
         prune_age_seconds: int = 7 * 24 * 60 * 60,
         min_priority_to_keep: int = 2,
         protect_reinforced: bool = True,
+        promotion_min_support: int = 2,
+        promotion_min_priority: int = 4,
     ) -> None:
         self.min_age_seconds = int(min_age_seconds)
         self.prune_age_seconds = int(prune_age_seconds)
         self.min_priority_to_keep = int(min_priority_to_keep)
         self.protect_reinforced = bool(protect_reinforced)
+        self.promotion_min_support = int(promotion_min_support)
+        self.promotion_min_priority = int(promotion_min_priority)
 
-    def run(
-        self,
-        storage,
-        dry_run: bool = True,
-    ) -> Dict[str, Any]:
+    def run(self, storage, dry_run: bool = True) -> Dict[str, Any]:
         now = time.time()
         records = storage.all()
 
@@ -43,35 +42,50 @@ class SleepConsolidator:
             if self._is_old_enough(record, now=now)
         ]
 
-        duplicate_actions = self._plan_duplicate_merges(candidates)
+        promotion_actions = self._plan_promotions(candidates)
+        promoted_ids = {
+            record["id"]
+            for action in promotion_actions
+            for record in action["source_records"]
+        }
+
+        duplicate_actions = self._plan_duplicate_merges(
+            [r for r in candidates if r["id"] not in promoted_ids]
+        )
         duplicate_ids = {action["record_id"] for action in duplicate_actions}
 
         prune_actions = self._plan_pruning(
-            candidates,
+            [r for r in candidates if r["id"] not in promoted_ids],
             now=now,
             skip_ids=duplicate_ids,
         )
-
         prune_ids = {action["record_id"] for action in prune_actions}
 
         keep_ids = {
             record["id"]
             for record in candidates
-            if record["id"] not in duplicate_ids and record["id"] not in prune_ids
+            if record["id"] not in promoted_ids
+            and record["id"] not in duplicate_ids
+            and record["id"] not in prune_ids
         }
 
         report = {
             "dry_run": dry_run,
             "scanned": len(records),
             "eligible": len(candidates),
+            "promoted": len(promotion_actions),
             "merged": len(duplicate_actions),
             "pruned": len(prune_actions),
             "kept": len(keep_ids),
+            "promotion_actions": self._serialize_promotion_actions(promotion_actions),
             "merge_actions": duplicate_actions,
             "prune_actions": prune_actions,
         }
 
         if not dry_run:
+            for action in promotion_actions:
+                storage.promote_to_semantic(action["source_records"])
+
             if duplicate_actions:
                 storage.merge_duplicates(duplicate_actions)
 
@@ -79,6 +93,60 @@ class SleepConsolidator:
                 storage.prune_memories(prune_actions)
 
         return report
+
+    def _plan_promotions(self, records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        grouped: Dict[Tuple[str, str, str], List[Dict[str, Any]]] = defaultdict(list)
+
+        for record in records:
+            if record.get("memory_type", "episodic") != "episodic":
+                continue
+            if record.get("status", "active") != "active":
+                continue
+
+            key = (
+                str(record["subject"]).strip().lower(),
+                str(record["predicate"]).strip().lower(),
+                str(record["object"]).strip().lower(),
+            )
+            grouped[key].append(record)
+
+        actions: List[Dict[str, Any]] = []
+
+        for key, cluster in grouped.items():
+            if len(cluster) < self.promotion_min_support:
+                continue
+
+            max_priority = max(int(record.get("priority", 3)) for record in cluster)
+            if max_priority < self.promotion_min_priority:
+                continue
+
+            actions.append({
+                "action": "PROMOTE",
+                "subject": key[0],
+                "predicate": key[1],
+                "object": key[2],
+                "support_count": len(cluster),
+                "source_records": cluster,
+                "reason": "repeated_episodic_memory",
+            })
+
+        return actions
+
+    def _serialize_promotion_actions(self, actions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        serialized: List[Dict[str, Any]] = []
+
+        for action in actions:
+            serialized.append({
+                "action": action["action"],
+                "subject": action["subject"],
+                "predicate": action["predicate"],
+                "object": action["object"],
+                "support_count": action["support_count"],
+                "source_record_ids": [record["id"] for record in action["source_records"]],
+                "reason": action["reason"],
+            })
+
+        return serialized
 
     def _plan_duplicate_merges(self, records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         grouped: Dict[Tuple[str, str, str], List[Dict[str, Any]]] = defaultdict(list)
@@ -150,6 +218,9 @@ class SleepConsolidator:
         return max(cluster, key=score)
 
     def _should_prune(self, record: Dict[str, Any], now: float) -> bool:
+        if record.get("memory_type") == "semantic":
+            return False
+
         priority = int(record.get("priority", 3))
         reinforcement_count = int(record.get("reinforcement_count", 0))
         created_at = float(record.get("created_at") or 0.0)

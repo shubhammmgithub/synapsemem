@@ -1,3 +1,12 @@
+"""SynapseMemory manager — Phase 3.
+
+New in Phase 3:
+  - storage_backend now supports 'qdrant' and 'chroma'
+  - New constructor params: qdrant_url, qdrant_api_key,
+    chroma_persist_directory, chroma_host, chroma_port
+  - All Phase 2 behaviour is unchanged
+"""
+
 from __future__ import annotations
 
 from typing import Any, Callable, Dict, List, Optional
@@ -20,15 +29,24 @@ class SynapseMemory:
         llm: Optional[Callable[[str], str]] = None,
         pinned_facts: Optional[List[str]] = None,
         decay_rate: float = 0.05,
+        # ── storage selection ──────────────────────────────────────────
         storage_backend: str = "memory",
+        # SQLite
         sqlite_db_path: str = "synapsemem.db",
+        # Qdrant
+        qdrant_url: str = "http://localhost:6333",
+        qdrant_api_key: Optional[str] = None,
+        # Chroma
+        chroma_persist_directory: Optional[str] = "./chroma_db",
+        chroma_host: Optional[str] = None,
+        chroma_port: int = 8000,
+        # ── scope ─────────────────────────────────────────────────────
         user_id: str = "default_user",
         agent_id: str = "default_agent",
         session_id: str = "default_session",
     ) -> None:
         self.llm = llm
         self.decay_rate = decay_rate
-
         self.user_id = user_id
         self.agent_id = agent_id
         self.session_id = session_id
@@ -40,16 +58,20 @@ class SynapseMemory:
         self.storage = self._build_storage(
             storage_backend=storage_backend,
             sqlite_db_path=sqlite_db_path,
+            qdrant_url=qdrant_url,
+            qdrant_api_key=qdrant_api_key,
+            chroma_persist_directory=chroma_persist_directory,
+            chroma_host=chroma_host,
+            chroma_port=chroma_port,
             user_id=user_id,
             agent_id=agent_id,
             session_id=session_id,
         )
+
         self.anchors = AnchorManager(initial_anchors=pinned_facts or [])
         self.prompt_builder = PromptBuilder()
-
         self.graph = KnowledgeGraph()
         self.graph_query = GraphQueryEngine(self.graph)
-
         self.retriever = MemoryRetriever(
             self.storage,
             anchor_manager=self.anchors,
@@ -58,10 +80,19 @@ class SynapseMemory:
 
         self._rebuild_graph_from_storage()
 
+    # ------------------------------------------------------------------ #
+    # Storage factory                                                      #
+    # ------------------------------------------------------------------ #
+
     def _build_storage(
         self,
         storage_backend: str,
         sqlite_db_path: str,
+        qdrant_url: str,
+        qdrant_api_key: Optional[str],
+        chroma_persist_directory: Optional[str],
+        chroma_host: Optional[str],
+        chroma_port: int,
         user_id: str,
         agent_id: str,
         session_id: str,
@@ -79,10 +110,35 @@ class SynapseMemory:
                 session_id=session_id,
             )
 
+        if backend == "qdrant":
+            from .memory.qdrant_storage import QdrantMemoryStorage
+            return QdrantMemoryStorage(
+                url=qdrant_url,
+                api_key=qdrant_api_key,
+                user_id=user_id,
+                agent_id=agent_id,
+                session_id=session_id,
+            )
+
+        if backend == "chroma":
+            from .memory.chroma_storage import ChromaMemoryStorage
+            return ChromaMemoryStorage(
+                persist_directory=chroma_persist_directory,
+                host=chroma_host,
+                port=chroma_port,
+                user_id=user_id,
+                agent_id=agent_id,
+                session_id=session_id,
+            )
+
         raise ValueError(
             f"Unsupported storage_backend='{storage_backend}'. "
-            f"Use 'memory' or 'sqlite'."
+            f"Choose from: 'memory', 'sqlite', 'qdrant', 'chroma'."
         )
+
+    # ------------------------------------------------------------------ #
+    # Graph                                                                #
+    # ------------------------------------------------------------------ #
 
     def _rebuild_graph_from_storage(self) -> None:
         records = self.storage.all()
@@ -96,6 +152,10 @@ class SynapseMemory:
         ]
         self.graph.clear()
         self.graph.add_triplets(triplets)
+
+    # ------------------------------------------------------------------ #
+    # Core API                                                             #
+    # ------------------------------------------------------------------ #
 
     def ingest(self, text: str) -> List[Dict[str, Any]]:
         triplets = self.extractor.extract(text)
@@ -169,6 +229,10 @@ class SynapseMemory:
 
         return self.llm(prompt)
 
+    # ------------------------------------------------------------------ #
+    # Anchors                                                              #
+    # ------------------------------------------------------------------ #
+
     def add_anchor(self, text: str) -> None:
         self.anchors.add_anchor(text)
 
@@ -177,6 +241,10 @@ class SynapseMemory:
 
     def get_anchors(self) -> List[str]:
         return self.anchors.get_anchors()
+
+    # ------------------------------------------------------------------ #
+    # Delete helpers                                                       #
+    # ------------------------------------------------------------------ #
 
     def delete_topic(self, topic: str) -> int:
         deleted = self.storage.delete_topic(topic)
@@ -189,9 +257,15 @@ class SynapseMemory:
         predicate: str | None = None,
         obj: str | None = None,
     ) -> int:
-        deleted = self.storage.delete_fact(subject=subject, predicate=predicate, obj=obj)
+        deleted = self.storage.delete_fact(
+            subject=subject, predicate=predicate, obj=obj
+        )
         self._rebuild_graph_from_storage()
         return deleted
+
+    # ------------------------------------------------------------------ #
+    # Graph helpers                                                        #
+    # ------------------------------------------------------------------ #
 
     def graph_facts_about(self, entity: str):
         return self.graph_query.facts_about(entity)
@@ -201,6 +275,10 @@ class SynapseMemory:
 
     def graph_find_path(self, start: str, target: str, max_hops: int = 3):
         return self.graph_query.find_path(start, target, max_hops=max_hops)
+
+    # ------------------------------------------------------------------ #
+    # Reset                                                                #
+    # ------------------------------------------------------------------ #
 
     def reset(self, clear_anchors: bool = False) -> None:
         self.storage.reset()

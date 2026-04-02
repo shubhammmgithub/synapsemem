@@ -5,11 +5,11 @@ from synapsemem import SynapseMemory
 from benchmarks.sample_data import SAMPLE_MEMORIES, SAMPLE_QUERIES
 
 
-def run_retrieve_benchmark(rounds: int = 3, top_k: int = 5):
+def run_retrieve_benchmark(rounds: int = 3, top_k: int = 5, storage_backend: str = "memory"):
     all_times = []
 
     for _ in range(rounds):
-        memory = SynapseMemory()
+        memory = SynapseMemory(storage_backend=storage_backend)
 
         for text in SAMPLE_MEMORIES:
             memory.ingest(text)
@@ -21,6 +21,7 @@ def run_retrieve_benchmark(rounds: int = 3, top_k: int = 5):
             all_times.append(end - start)
 
     print("\n=== Retrieval Benchmark ===")
+    print(f"Backend: {storage_backend}")
     print(f"Queries: {len(SAMPLE_QUERIES) * rounds}")
     print(f"Average retrieve time: {statistics.mean(all_times):.6f} sec")
     print(f"Median retrieve time:  {statistics.median(all_times):.6f} sec")

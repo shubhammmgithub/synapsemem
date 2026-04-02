@@ -25,6 +25,12 @@ def run_prompt_benchmark():
         print(f"Query: {query}")
         print(f"Prompt characters: {len(prompt)}")
         print(f"Approx tokens: {token_count}")
+        print("Top memories:")
+        for result in results[:3]:
+            print(
+                f"  - {result['subject']} {result['predicate']} {result['object']} "
+                f"[type={result.get('memory_type', 'episodic')}, score={result.get('score')}]"
+            )
 
 
 if __name__ == "__main__":

@@ -54,3 +54,15 @@ QUALITY_TEST_CASES = [
         "expected_substring": "Dadri",
     },
 ]
+
+SLEEP_TEST_MEMORIES = [
+    "John likes coffee shops.",
+    "John likes coffee shops.",
+    "John is located in Rome.",
+    "John is located in Rome.",
+    "I am interested in AI agents.",
+    "I am interested in AI agents.",
+    "I am in Dadri.",
+]
+
+SLEEP_TEST_QUERY = "What does John like?"
